@@ -1,0 +1,378 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SubscriptionTier {
+  FREE
+  PREMIUM
+  ULTIMATE
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+enum AppearanceMode {
+  LIGHT
+  DARK
+  SYSTEM
+}
+
+enum UserTier {
+  ROOKIE
+  APPRENTICE
+  ADEPT
+  ELITE
+  LEGEND
+}
+
+enum HabitCategory {
+  MINDFULNESS
+  FOCUS
+  HEALTH
+  PHYSICAL
+  GROWTH
+}
+
+enum TimeWindow {
+  MORNING
+  AFTERNOON
+  EVENING
+  NIGHT
+  ANYTIME
+}
+
+enum FrequencyType {
+  DAILY
+  WEEKLY
+  CUSTOM_DAYS
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum GoalCategory {
+  READING
+  FITNESS
+  FINANCE
+  LEARNING
+  CAREER
+  CREATIVE
+  PERSONAL
+  TRAVEL
+}
+
+enum GoalStatus {
+  ACTIVE
+  COMPLETED
+  ABANDONED
+}
+
+enum AchievementType {
+  GOAL_COMPLETION
+  MILESTONE
+  STREAK
+  CONSISTENCY
+  SKILL_LEVEL
+}
+
+enum InsightType {
+  BEST_TIME
+  HABIT_CORRELATION
+  CONSISTENCY_TREND
+  RECOMMENDATION
+  STREAK_ALERT
+}
+
+enum AnalyticsPeriod {
+  WEEKLY
+  MONTHLY
+}
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  passwordHash    String?
+  fullName        String    @db.VarChar(120)
+  avatarUrl       String?
+  bio             String?   @db.VarChar(280)
+  currentStreak   Int       @default(0)
+  bestStreak      Int       @default(0)
+  xpPoints        Int       @default(0)
+  tier            UserTier  @default(ROOKIE)
+  timezone        String    @default("UTC") @db.VarChar(64)
+  verified        Boolean   @default(false)
+  emailOtp        String?
+  emailOtpExpires DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  settings     UserSettings?
+  subscription Subscription?
+  accounts     Account[]
+  sessions     Session[]
+  habits       Habit[]
+  habitLogs    HabitLog[]
+  goals        Goal[]
+  victories    UserAchievement[]
+  insights     Insight[]
+  snapshots    AnalyticsSnapshot[]
+  resetTokens  PasswordResetToken[]
+}
+
+model UserSettings {
+  id                   String         @id @default(cuid())
+  userId               String         @unique
+  notificationsEnabled Boolean        @default(true)
+  pushNotifications    Boolean        @default(true)
+  emailNotifications   Boolean        @default(false)
+  appearanceMode       AppearanceMode @default(SYSTEM)
+  themeColor           String         @default("ember") @db.VarChar(32)
+  language             String         @default("en") @db.VarChar(8)
+  weekStartsOn         DayOfWeek      @default(MONDAY)
+  updatedAt            DateTime       @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  provider          String  @db.VarChar(32)
+  providerAccountId String  @db.VarChar(191)
+  accessToken       String?
+  refreshToken      String?
+  expiresAt         Int?
+  tokenType         String? @db.VarChar(32)
+  scope             String? @db.VarChar(191)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  sessionToken String   @unique
+  expiresAt    DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Subscription {
+  id                 String             @id @default(cuid())
+  userId             String             @unique
+  tier               SubscriptionTier   @default(FREE)
+  status             SubscriptionStatus @default(ACTIVE)
+  paymentProvider    String?            @db.VarChar(32)
+  externalId         String?            @db.VarChar(191)
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  cancelAtPeriodEnd  Boolean            @default(false)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+model Habit {
+  id               String        @id @default(cuid())
+  userId           String
+  title            String        @db.VarChar(120)
+  description      String?       @db.VarChar(500)
+  category         HabitCategory
+  icon             String        @default("flame") @db.VarChar(32)
+  colorTheme       String        @default("#F97316") @db.VarChar(16)
+  targetValue      Decimal       @db.Decimal(10, 2)
+  unit             String        @db.VarChar(24)
+  timeWindow       TimeWindow    @default(ANYTIME)
+  frequency        FrequencyType @default(DAILY)
+  timesPerWeek     Int?
+  customDays       DayOfWeek[]
+  currentStreak    Int           @default(0)
+  bestStreak       Int           @default(0)
+  totalCompletions Int           @default(0)
+  startDate        DateTime      @default(now()) @db.Date
+  isArchived       Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs HabitLog[]
+
+  @@unique([userId, title])
+  @@index([userId])
+  @@index([category])
+  @@index([userId, isArchived])
+}
+
+model HabitLog {
+  id              String    @id @default(cuid())
+  habitId         String
+  userId          String
+  date            DateTime  @db.Date
+  completed       Boolean   @default(false)
+  valueLogged     Decimal?  @db.Decimal(10, 2)
+  durationMinutes Int?
+  completedAt     DateTime?
+  note            String?   @db.VarChar(500)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  habit Habit @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([habitId, date])
+  @@index([habitId])
+  @@index([userId, date])
+}
+
+model Goal {
+  id           String       @id @default(cuid())
+  userId       String
+  category     GoalCategory
+  title        String       @db.VarChar(160)
+  description  String?      @db.VarChar(500)
+  targetValue  Decimal      @db.Decimal(12, 2)
+  unit         String       @db.VarChar(24)
+  currentValue Decimal      @default(0) @db.Decimal(12, 2)
+  startDate    DateTime     @default(now()) @db.Date
+  targetDate   DateTime?    @db.Date
+  status       GoalStatus   @default(ACTIVE)
+  completedAt  DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  milestones Milestone[]
+  victories  UserAchievement[]
+
+  @@index([userId, status])
+  @@index([targetDate])
+}
+
+model Milestone {
+  id            String    @id @default(cuid())
+  goalId        String
+  title         String    @db.VarChar(160)
+  sequenceOrder Int
+  isCompleted   Boolean   @default(false)
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@unique([goalId, sequenceOrder])
+  @@index([goalId])
+}
+
+model Achievement {
+  id          String          @id @default(cuid())
+  code        String          @unique
+  title       String          @db.VarChar(120)
+  description String?         @db.VarChar(280)
+  icon        String          @default("trophy") @db.VarChar(32)
+  type        AchievementType
+
+  victories UserAchievement[]
+}
+
+model UserAchievement {
+  id            String   @id @default(cuid())
+  userId        String
+  achievementId String
+  goalId        String?
+  earnedAt      DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  goal        Goal?       @relation(fields: [goalId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+  @@index([earnedAt])
+}
+
+model Quote {
+  id            String   @id @default(cuid())
+  content       String   @db.VarChar(500)
+  author        String   @db.VarChar(120)
+  displayedDate DateTime @db.Date
+  createdAt     DateTime @default(now())
+
+  @@unique([displayedDate])
+}
+
+model Insight {
+  id          String      @id @default(cuid())
+  userId      String
+  type        InsightType
+  title       String      @db.VarChar(160)
+  content     String      @db.VarChar(600)
+  data        Json?
+  isDismissed Boolean     @default(false)
+  generatedAt DateTime    @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, generatedAt])
+  @@index([type])
+}
+
+model AnalyticsSnapshot {
+  id          String          @id @default(cuid())
+  userId      String
+  period      AnalyticsPeriod
+  periodStart DateTime        @db.Date
+  metrics     Json
+  computedAt  DateTime        @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, period, periodStart])
+}
+
+model VerificationToken {
+  identifier String   @db.VarChar(191)
+  token      String   @unique @db.VarChar(191)
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@index([identifier])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique @db.VarChar(191)
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}

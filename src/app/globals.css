@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-forest: #1a3c34;
+  --color-forest-deep: #122b25;
+  --color-mist: #f8faf8;
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+}
+
+html {
+  background-color: var(--color-mist);
+}
+
+body {
+  color: var(--color-slate-800);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Dark mode overrides */
+html.dark {
+  background-color: #0f172a;
+}
+
+html.dark body {
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
