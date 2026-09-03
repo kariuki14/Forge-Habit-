@@ -40,7 +40,13 @@ export function tierForXp(xpPoints: number): UserTier {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export class AuthError extends Error {}
+export class AuthError extends Error {
+  code?: string;
+  constructor(message: string, code?: string) {
+    super(message);
+    this.code = code;
+  }
+}
 
 export async function createUserWithDefaults(input: {
   email: string;
@@ -85,7 +91,7 @@ export async function authenticate(email: string, password: string) {
   if (!(await verifyPassword(password, user.passwordHash))) {
     throw new AuthError("Invalid email or password");
   }
-  if (!user.verified) throw new AuthError("Please verify your email before logging in");
+  if (!user.verified) throw new AuthError("Please verify your email before logging in", "UNVERIFIED");
   return user;
 }
 
@@ -167,7 +173,12 @@ export async function resetPassword(token: string, newPassword: string) {
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
       where: { id: user.id },
-      data: { passwordHash: await hashPassword(newPassword) },
+      data: { 
+        passwordHash: await hashPassword(newPassword),
+        verified: true,
+        emailOtp: null,
+        emailOtpExpires: null,
+      },
     });
     await tx.passwordResetToken.update({
       where: { token },

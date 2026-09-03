@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Flame, Lock, ArrowLeft, CheckCircle } from "lucide-react";
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
 
@@ -153,5 +153,19 @@ export default function ResetPasswordPage() {
         </form>
       )}
     </main>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 py-10">
+        <div className="text-center">
+          <div className="animate-pulse">Loading...</div>
+        </div>
+      </main>
+    }>
+      <ResetPasswordContent />
+    </Suspense>
   );
 }

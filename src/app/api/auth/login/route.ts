@@ -21,7 +21,7 @@ export async function POST(req: Request) {
     });
   } catch (e) {
     if (e instanceof AuthError) {
-      return NextResponse.json({ error: e.message }, { status: 401 });
+      return NextResponse.json({ error: e.message, code: e.code }, { status: 401 });
     }
     console.error(e);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

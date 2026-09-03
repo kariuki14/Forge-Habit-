@@ -17,8 +17,14 @@ export async function POST(req: Request) {
     const user = await prisma.user.findUnique({ where: { email } });
     if (user) {
       const token = await createPasswordResetToken(user.id);
-      const appUrl = process.env.APP_URL || "http://localhost:3000";
-      const resetUrl = `${appUrl}/reset-password?token=${token}`;
+      const appUrl = process.env.APP_URL;
+      if (!appUrl) {
+        if (process.env.NODE_ENV === "production") {
+          throw new Error("APP_URL environment variable is not set");
+        }
+        // Allow localhost fallback in development only
+      }
+      const resetUrl = `${appUrl ?? "http://localhost:3000"}/reset-password?token=${token}`;
       await sendPasswordResetEmail(email, resetUrl);
     }
 

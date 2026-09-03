@@ -1,4 +1,5 @@
 import { Bell, Smartphone, Moon, ChevronRight, HelpCircle, FileText } from "lucide-react";
+import Link from "next/link";
 import { Avatar } from "@/components/PageHeader";
 import ToggleSwitch, { AppearanceModeSwitch } from "@/components/ToggleSwitch";
 import { signOutAction } from "@/actions/auth";
@@ -14,8 +15,8 @@ export default async function SettingsPage() {
   });
 
   const accountItems = [
-    { icon: FileText, label: "Personal Information", hint: sessionUser.email },
-    { icon: HelpCircle, label: "Help & Support", hint: "" },
+    { icon: FileText, label: "Personal Information", hint: sessionUser.email, href: "/settings/personal-info" },
+    { icon: HelpCircle, label: "Help & Support", hint: "", href: "/settings/help" },
   ];
 
   return (
@@ -51,10 +52,10 @@ export default async function SettingsPage() {
             Account
           </p>
           <div className="overflow-hidden rounded-2xl border border-slate-200/60 dark:border-slate-700/60 bg-white dark:bg-slate-800 shadow-sm">
-            {accountItems.map(({ icon: Icon, label, hint }, i) => (
-              <button
+            {accountItems.map(({ icon: Icon, label, hint, href }, i) => (
+              <Link
                 key={label}
-                type="button"
+                href={href}
                 className={`flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-700 ${
                   i > 0 ? "border-t border-slate-100 dark:border-slate-700" : ""
                 }`}
@@ -63,7 +64,7 @@ export default async function SettingsPage() {
                 <span className="flex-1 text-sm font-medium text-slate-700 dark:text-slate-200">{label}</span>
                 {hint && <span className="max-w-[45%] truncate text-xs text-slate-400 dark:text-slate-500">{hint}</span>}
                 <ChevronRight size={16} className="text-slate-300 dark:text-slate-600" />
-              </button>
+              </Link>
             ))}
           </div>
         </section>

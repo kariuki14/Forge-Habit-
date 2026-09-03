@@ -46,19 +46,45 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
 
     const form = e.currentTarget;
     const data = new FormData(form);
+    const email = String(data.get("email") ?? "");
 
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: data.get("email"),
+          email,
           password: data.get("password"),
         }),
       });
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Login failed");
+      if (!res.ok) {
+        if (result.code === "UNVERIFIED") {
+          setOtpEmail(email);
+          setStep("otp");
+          await sendOtpForLogin(email);
+          return;
+        }
+        throw new Error(result.error || "Login failed");
+      }
       window.location.href = "/today";
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong");
+      setLoading(false);
+    }
+  }
+
+  async function sendOtpForLogin(email: string) {
+    try {
+      const res = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Failed to send verification code");
+      setLoading(false);
+      startResendTimer();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
       setLoading(false);
