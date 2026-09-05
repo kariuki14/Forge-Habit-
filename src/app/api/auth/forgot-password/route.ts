@@ -3,13 +3,23 @@ import { AuthError, createPasswordResetToken } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { rateLimit, clientKey, AUTH_LIMIT } from "@/lib/rate-limit";
+import { forgotPasswordSchema } from "@/lib/validations";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     if (!body || typeof body !== "object") throw new AuthError("Invalid request body");
 
-    const email = String(body.email ?? "").trim().toLowerCase();
+    // Always return same generic response below — do not reveal validation
+    // specifics for unknown emails, but do reject malformed input.
+    const parsed = forgotPasswordSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Invalid input" },
+        { status: 400 }
+      );
+    }
+    const email = parsed.data.email;
     if (!rateLimit(clientKey(req.headers, email), AUTH_LIMIT.limit, AUTH_LIMIT.windowMs)) {
       return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
     }

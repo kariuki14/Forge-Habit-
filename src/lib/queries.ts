@@ -194,10 +194,15 @@ export async function getInsightsView(userId: string) {
 }
 
 export async function getGoalsView(userId: string) {
-  const [goals, earned] = await Promise.all([
+  const [goals, completedGoals, earned] = await Promise.all([
     prisma.goal.findMany({
       where: { userId, status: "ACTIVE" },
       orderBy: { createdAt: "asc" },
+      include: { milestones: { orderBy: { sequenceOrder: "asc" } } },
+    }),
+    prisma.goal.findMany({
+      where: { userId, status: "COMPLETED" },
+      orderBy: { completedAt: "desc" },
       include: { milestones: { orderBy: { sequenceOrder: "asc" } } },
     }),
     prisma.userAchievement.findMany({
@@ -225,6 +230,7 @@ export async function getGoalsView(userId: string) {
         id: g.id,
         title: g.title,
         description: g.description,
+        category: g.category,
         icon: goalIcon(g.category),
         currentValue: Number(g.currentValue),
         targetValue: Number(g.targetValue),
@@ -237,6 +243,17 @@ export async function getGoalsView(userId: string) {
         pace,
       };
     }),
+    completedGoals: completedGoals.map((g) => ({
+      id: g.id,
+      title: g.title,
+      description: g.description,
+      category: g.category,
+      icon: goalIcon(g.category),
+      currentValue: Number(g.currentValue),
+      targetValue: Number(g.targetValue),
+      unit: g.unit,
+      completedAt: g.completedAt,
+    })),
     trophies: earned.map((ua) => ({
       id: ua.id,
       code: ua.achievement.code,

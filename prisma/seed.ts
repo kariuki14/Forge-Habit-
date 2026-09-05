@@ -5,6 +5,7 @@ import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
 const prisma = new PrismaClient();
 
 const DEMO_EMAIL = "demo@forgehabit.app";
+const DEMO_PASSWORD = process.env.SEED_DEMO_PASSWORD ?? "demo-password-change-me";
 
 function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");
@@ -140,7 +141,7 @@ async function main() {
   const user = await prisma.user.create({
     data: {
       email: DEMO_EMAIL,
-      passwordHash: hashPassword("Forge#Demo2026"),
+      passwordHash: hashPassword(DEMO_PASSWORD),
       fullName: "Simon Wanjira",
       avatarUrl: "https://api.dicebear.com/9.x/notionists/svg?seed=forge-demo",
       bio: "Forging discipline, one rep at a time.",

@@ -1,6 +1,7 @@
-import { Trophy, Star } from "lucide-react";
+import { Trophy, Star, CheckCircle2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import GoalProgressCard from "@/components/GoalProgressCard";
+import CompletedGoalCard from "@/components/CompletedGoalCard";
 import NewGoalSheet from "@/components/NewGoalSheet";
 import { getGoalsView } from "@/lib/queries";
 import { getSessionUser } from "@/lib/session";
@@ -8,7 +9,7 @@ import { getSessionUser } from "@/lib/session";
 export default async function GoalsPage() {
   const sessionUser = await getSessionUser();
   if (!sessionUser) return null;
-  const { goals, trophies } = await getGoalsView(sessionUser.id);
+  const { goals, completedGoals, trophies } = await getGoalsView(sessionUser.id);
 
   return (
     <div className="space-y-6">
@@ -35,10 +36,26 @@ export default async function GoalsPage() {
         </div>
       </section>
 
+      {completedGoals.length > 0 && (
+        <section>
+          <div className="mb-3 flex items-center gap-2">
+            <CheckCircle2 size={16} className="text-lime-500" />
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              Completed Journeys ({completedGoals.length})
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+            {completedGoals.map((goal) => (
+              <CompletedGoalCard key={goal.id} goal={goal} />
+            ))}
+          </div>
+        </section>
+      )}
+
       <section>
         <div className="mb-3 flex items-center gap-2">
           <Trophy size={16} className="text-amber-400" />
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
             Wall of Victory
           </p>
         </div>

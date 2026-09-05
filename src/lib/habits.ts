@@ -1,6 +1,7 @@
 import { Prisma, HabitCategory, FrequencyType, TimeWindow, DayOfWeek } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { XP_PER_COMPLETION, tierForXp } from "@/lib/auth";
+import { habitInputSchema, checkInSchema } from "@/lib/validations";
 
 export class HabitError extends Error {}
 
@@ -127,7 +128,11 @@ export async function listHabits(userId: string) {
   }));
 }
 
-export async function createHabit(userId: string, input: HabitInput) {
+export async function createHabit(userId: string, rawInput: HabitInput) {
+  const parsed = habitInputSchema.safeParse(rawInput);
+  if (!parsed.success) throw new HabitError(parsed.error.issues[0]?.message ?? "Invalid habit data");
+  const input = parsed.data;
+
   const title = input.title.trim();
   if (title.length < 1 || title.length > 120) throw new HabitError("Title must be 1-120 characters");
   const description = input.description?.trim() || null;
@@ -327,8 +332,12 @@ export async function toggleCheckIn(userId: string, habitId: string) {
 export async function checkIn(
   userId: string,
   habitId: string,
-  input: { valueLogged?: number; durationMinutes?: number; note?: string } = {}
+  rawInput: { valueLogged?: number; durationMinutes?: number; note?: string } = {}
 ) {
+  const parsed = checkInSchema.safeParse(rawInput);
+  if (!parsed.success) throw new HabitError(parsed.error.issues[0]?.message ?? "Invalid check-in data");
+  const input = parsed.data;
+
   if (input.note != null && input.note.length > 500)
     throw new HabitError("Note must be at most 500 characters");
   if (

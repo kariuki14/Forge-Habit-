@@ -14,13 +14,14 @@ function refreshHabitViews() {
 
 export async function toggleCheckInAction(habitId: string) {
   const user = await getSessionUser();
-  if (!user) throw new Error("Unauthorized");
+  if (!user) return { error: "Unauthorized" };
 
   try {
     await toggleCheckIn(user.id, habitId);
   } catch (e) {
     if (e instanceof HabitError) return { error: e.message };
-    throw e;
+    console.error(e);
+    return { error: "Could not update habit" };
   }
   refreshHabitViews();
   return { error: null };

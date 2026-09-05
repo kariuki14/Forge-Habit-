@@ -95,7 +95,7 @@ export default function NewGoalSheet() {
                 step="any"
                 min="0.01"
                 required
-                defaultValue={1}
+                placeholder="e.g. 24"
                 className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-3 py-2.5 text-sm outline-none focus:border-lime-500"
               />
             </div>

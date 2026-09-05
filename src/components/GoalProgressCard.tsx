@@ -1,6 +1,7 @@
 import { ChevronRight, Flag, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import GoalCheckin from "@/components/GoalCheckin";
+import GoalDeleteButton from "@/components/GoalDeleteButton";
 
 const PACE_META: Record<string, { icon: LucideIcon; className: string; label: string }> = {
   ahead: { icon: TrendingUp, className: "text-lime-600", label: "Ahead of schedule" },
@@ -42,10 +43,13 @@ export default function GoalProgressCard({
             {goal.unit.toLowerCase()}
           </p>
         </div>
-        <span className={`flex items-center gap-1 rounded-full bg-slate-50 dark:bg-slate-700 px-2 py-1 text-[11px] font-semibold ${paceClass}`}>
-          <PaceIcon size={12} strokeWidth={2.5} />
-          {paceLabel}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className={`flex items-center gap-1 rounded-full bg-slate-50 dark:bg-slate-700 px-2 py-1 text-[11px] font-semibold ${paceClass}`}>
+            <PaceIcon size={12} strokeWidth={2.5} />
+            {paceLabel}
+          </span>
+          <GoalDeleteButton goalId={goal.id} />
+        </div>
       </div>
 
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-emerald-100 dark:bg-emerald-900/40">
