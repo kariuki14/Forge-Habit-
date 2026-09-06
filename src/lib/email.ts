@@ -1,18 +1,27 @@
 import nodemailer from "nodemailer";
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT || 587),
-  secure: Number(process.env.SMTP_PORT || 587) === 465,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+const SMTP_CONFIGURED = Boolean(process.env.SMTP_HOST);
+
+const transporter = SMTP_CONFIGURED
+  ? nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT || 587),
+      secure: Number(process.env.SMTP_PORT || 587) === 465,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    })
+  : null;
 
 const FROM = process.env.EMAIL_FROM || "noreply@forge.app";
 
 export async function sendOtpEmail(to: string, code: string) {
+  if (!transporter) {
+    // Dev fallback: no SMTP configured -> log the code instead of failing.
+    console.warn(`[email] SMTP not configured. OTP for ${to}: ${code}`);
+    return;
+  }
   await transporter.sendMail({
     from: FROM,
     to,
@@ -35,6 +44,10 @@ export async function sendOtpEmail(to: string, code: string) {
 }
 
 export async function sendPasswordResetEmail(to: string, resetUrl: string) {
+  if (!transporter) {
+    console.warn(`[email] SMTP not configured. Password reset link for ${to}: ${resetUrl}`);
+    return;
+  }
   await transporter.sendMail({
     from: FROM,
     to,

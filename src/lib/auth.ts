@@ -83,6 +83,83 @@ export async function createUserWithDefaults(input: {
   });
 }
 
+export interface OAuthProfile {
+  provider: string;
+  providerAccountId: string;
+  email: string;
+  fullName: string;
+  avatarUrl?: string;
+}
+
+export interface OAuthSignInResult {
+  user: { id: string; email: string; fullName: string; verified: boolean };
+  /** 6-digit OTP to email when the account still needs verification, else null. */
+  otp: string | null;
+}
+
+/**
+ * Find-or-create a user from an OAuth provider profile.
+ * - Existing linked account -> its user.
+ * - Existing email -> link the provider to that user.
+ * - New email -> create unverified user + linked account; OTP returned for verification.
+ * Returns `otp` when the user still needs email verification.
+ */
+export async function signInWithOAuth(profile: OAuthProfile): Promise<OAuthSignInResult> {
+  const email = profile.email.trim().toLowerCase();
+  if (!EMAIL_RE.test(email)) throw new AuthError("Invalid email address from provider");
+
+  const linked = await prisma.account.findUnique({
+    where: {
+      provider_providerAccountId: {
+        provider: profile.provider,
+        providerAccountId: profile.providerAccountId,
+      },
+    },
+    include: { user: true },
+  });
+  if (linked) {
+    if (linked.user.verified) return { user: linked.user, otp: null };
+    return { user: linked.user, otp: await resendOtp(linked.user.email) };
+  }
+
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    await prisma.account.create({
+      data: {
+        userId: existing.id,
+        provider: profile.provider,
+        providerAccountId: profile.providerAccountId,
+      },
+    });
+    if (existing.verified) return { user: existing, otp: null };
+    return { user: existing, otp: await resendOtp(email) };
+  }
+
+  const otp = generateOtp();
+  const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+  const user = await prisma.$transaction(async (tx) => {
+    return tx.user.create({
+      data: {
+        email,
+        fullName: profile.fullName.trim().slice(0, 120) || email.split("@")[0],
+        avatarUrl: profile.avatarUrl ?? null,
+        verified: false,
+        emailOtp: otp,
+        emailOtpExpires: otpExpires,
+        settings: { create: {} },
+        subscription: { create: {} },
+        accounts: {
+          create: {
+            provider: profile.provider,
+            providerAccountId: profile.providerAccountId,
+          },
+        },
+      },
+    });
+  });
+  return { user, otp };
+}
+
 export async function authenticate(email: string, password: string) {
   const user = await prisma.user.findUnique({
     where: { email: email.trim().toLowerCase() },

@@ -2,14 +2,26 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Flame, Mail, Lock, ArrowLeft, CheckCircle, Loader2 } from "lucide-react";
 import { OAuthButtons } from "@/components/OAuthButtons";
 
 type Step = "form" | "otp";
 
+const OAUTH_ERRORS: Record<string, string> = {
+  oauth_cancelled: "Google sign-in was cancelled.",
+  oauth_not_configured: "Google sign-in is not configured on this server.",
+  invalid_state: "Sign-in session expired. Please try again.",
+  oauth_failed: "Google sign-in failed. Please try again.",
+};
+
 export default function AuthForm({ mode }: { mode: "login" | "register" }) {
+  const searchParams = useSearchParams();
+  const oauthError = searchParams.get("error");
   const [step, setStep] = useState<Step>("form");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    oauthError ? (OAUTH_ERRORS[oauthError] ?? "Sign-in failed. Please try again.") : null
+  );
   const [loading, setLoading] = useState(false);
 
   // Register-specific state
