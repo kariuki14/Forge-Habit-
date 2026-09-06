@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { AuthError, createPasswordResetToken } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { emailIndex } from "@/lib/crypto";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { rateLimit, clientKey, AUTH_LIMIT } from "@/lib/rate-limit";
 import { forgotPasswordSchema } from "@/lib/validations";
@@ -24,7 +25,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ where: { emailIndex: emailIndex(email) } });
     if (user) {
       const token = await createPasswordResetToken(user.id);
       const appUrl = process.env.APP_URL;

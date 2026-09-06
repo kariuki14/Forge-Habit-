@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { PrismaClient, DayOfWeek, HabitCategory } from "@prisma/client";
 import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
+import { emailIndex, generateDek, wrapDek, encryptField } from "../src/lib/crypto";
 
 const prisma = new PrismaClient();
 
@@ -134,17 +135,20 @@ function computeStreaks(logs: LogSeed[]) {
 }
 
 async function main() {
-  await prisma.user.deleteMany({ where: { email: DEMO_EMAIL } });
+  await prisma.user.deleteMany({ where: { emailIndex: emailIndex(DEMO_EMAIL) } });
 
   await seedCatalogs();
 
+  const dek = generateDek();
   const user = await prisma.user.create({
     data: {
-      email: DEMO_EMAIL,
+      email: encryptField(dek, DEMO_EMAIL)!,
+      emailIndex: emailIndex(DEMO_EMAIL),
       passwordHash: hashPassword(DEMO_PASSWORD),
-      fullName: "Simon Wanjira",
-      avatarUrl: "https://api.dicebear.com/9.x/notionists/svg?seed=forge-demo",
-      bio: "Forging discipline, one rep at a time.",
+      fullName: encryptField(dek, "Simon Wanjira")!,
+      avatarUrl: encryptField(dek, "https://api.dicebear.com/9.x/notionists/svg?seed=forge-demo"),
+      bio: encryptField(dek, "Forging discipline, one rep at a time."),
+      key: { create: { wrappedDek: wrapDek(dek) } },
       currentStreak: 12,
       bestStreak: 34,
       xpPoints: 12_450,

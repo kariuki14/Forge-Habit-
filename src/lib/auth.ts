@@ -1,7 +1,9 @@
 import { randomBytes, randomInt, scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { prisma } from "@/lib/prisma";
-import type { UserTier } from "@prisma/client";
+import { emailIndex, generateDek, wrapDek } from "@/lib/crypto";
+import { decryptUser, decryptUserFields, encryptUserFields } from "@/lib/pii";
+import type { User, UserTier } from "@prisma/client";
 
 const scryptAsync = promisify(scrypt);
 
@@ -52,7 +54,7 @@ export async function createUserWithDefaults(input: {
   email: string;
   password: string;
   fullName: string;
-}) {
+}): Promise<User> {
   const email = input.email.trim().toLowerCase();
   const fullName = input.fullName.trim();
 
@@ -60,26 +62,28 @@ export async function createUserWithDefaults(input: {
   if (input.password.length < 8) throw new AuthError("Password must be at least 8 characters");
   if (fullName.length < 1 || fullName.length > 120) throw new AuthError("Name must be 1-120 characters");
 
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const existing = await prisma.user.findUnique({ where: { emailIndex: emailIndex(email) } });
   if (existing) throw new AuthError("An account with this email already exists");
 
+  const dek = generateDek();
   const otp = generateOtp();
   const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
   return prisma.$transaction(async (tx) => {
     const user = await tx.user.create({
       data: {
-        email,
+        ...encryptUserFields(dek, { email, fullName }),
         passwordHash: await hashPassword(input.password),
-        fullName,
         verified: false,
         emailOtp: otp,
         emailOtpExpires: otpExpires,
         settings: { create: {} },
         subscription: { create: {} },
+        key: { create: { wrappedDek: wrapDek(dek) } },
       },
     });
-    return user;
+    // Return a copy with plaintext PII — never expose ciphertext to callers.
+    return decryptUserFields(dek, user);
   });
 }
 
@@ -92,7 +96,7 @@ export interface OAuthProfile {
 }
 
 export interface OAuthSignInResult {
-  user: { id: string; email: string; fullName: string; verified: boolean };
+  user: User; // plaintext PII fields
   /** 6-digit OTP to email when the account still needs verification, else null. */
   otp: string | null;
 }
@@ -115,14 +119,18 @@ export async function signInWithOAuth(profile: OAuthProfile): Promise<OAuthSignI
         providerAccountId: profile.providerAccountId,
       },
     },
-    include: { user: true },
+    include: { user: { include: { key: true } } },
   });
   if (linked) {
-    if (linked.user.verified) return { user: linked.user, otp: null };
-    return { user: linked.user, otp: await resendOtp(linked.user.email) };
+    const user = decryptUser(linked.user);
+    if (user.verified) return { user, otp: null };
+    return { user, otp: await resendOtp(email) };
   }
 
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const existing = await prisma.user.findUnique({
+    where: { emailIndex: emailIndex(email) },
+    include: { key: true },
+  });
   if (existing) {
     await prisma.account.create({
       data: {
@@ -131,23 +139,28 @@ export async function signInWithOAuth(profile: OAuthProfile): Promise<OAuthSignI
         providerAccountId: profile.providerAccountId,
       },
     });
-    if (existing.verified) return { user: existing, otp: null };
-    return { user: existing, otp: await resendOtp(email) };
+    const user = decryptUser(existing);
+    if (existing.verified) return { user, otp: null };
+    return { user, otp: await resendOtp(email) };
   }
 
+  const dek = generateDek();
   const otp = generateOtp();
   const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
   const user = await prisma.$transaction(async (tx) => {
     return tx.user.create({
       data: {
-        email,
-        fullName: profile.fullName.trim().slice(0, 120) || email.split("@")[0],
-        avatarUrl: profile.avatarUrl ?? null,
+        ...encryptUserFields(dek, {
+          email,
+          fullName: profile.fullName.trim().slice(0, 120) || email.split("@")[0],
+          avatarUrl: profile.avatarUrl ?? null,
+        }),
         verified: false,
         emailOtp: otp,
         emailOtpExpires: otpExpires,
         settings: { create: {} },
         subscription: { create: {} },
+        key: { create: { wrappedDek: wrapDek(dek) } },
         accounts: {
           create: {
             provider: profile.provider,
@@ -157,19 +170,20 @@ export async function signInWithOAuth(profile: OAuthProfile): Promise<OAuthSignI
       },
     });
   });
-  return { user, otp };
+  return { user: decryptUserFields(dek, user), otp };
 }
 
-export async function authenticate(email: string, password: string) {
+export async function authenticate(email: string, password: string): Promise<User> {
   const user = await prisma.user.findUnique({
-    where: { email: email.trim().toLowerCase() },
+    where: { emailIndex: emailIndex(email) },
+    include: { key: true },
   });
   if (!user?.passwordHash) throw new AuthError("Invalid email or password");
   if (!(await verifyPassword(password, user.passwordHash))) {
     throw new AuthError("Invalid email or password");
   }
   if (!user.verified) throw new AuthError("Please verify your email before logging in", "UNVERIFIED");
-  return user;
+  return decryptUser(user);
 }
 
 export function generateOtp(): string {
@@ -177,9 +191,10 @@ export function generateOtp(): string {
   return randomInt(100_000, 1_000_000).toString();
 }
 
-export async function verifyOtp(email: string, otp: string) {
+export async function verifyOtp(email: string, otp: string): Promise<User> {
   const user = await prisma.user.findUnique({
-    where: { email: email.trim().toLowerCase() },
+    where: { emailIndex: emailIndex(email) },
+    include: { key: true },
   });
   if (!user) throw new AuthError("No account found with this email");
   if (user.verified) throw new AuthError("This account is already verified");
@@ -196,12 +211,12 @@ export async function verifyOtp(email: string, otp: string) {
     },
   });
 
-  return user;
+  return decryptUser(user);
 }
 
 export async function resendOtp(email: string) {
   const user = await prisma.user.findUnique({
-    where: { email: email.trim().toLowerCase() },
+    where: { emailIndex: emailIndex(email) },
   });
   if (!user) throw new AuthError("No account found with this email");
   if (user.verified) throw new AuthError("This account is already verified");
@@ -241,6 +256,25 @@ export async function verifyPasswordResetToken(token: string) {
   if (record.used) throw new AuthError("This reset link has already been used");
   if (record.expiresAt < new Date()) throw new AuthError("This reset link has expired");
   return record.user;
+}
+
+/**
+ * Permanent account erasure with crypto-shredding ("right to be forgotten").
+ *
+ * 1. The UserKey row (wrapped DEK) is destroyed FIRST. From this point the
+ *    user's ciphertext PII is unrecoverable even from cold backups — the
+ *    only copy of the DEK was wrapped under the KEK and stored nowhere else.
+ * 2. The user row is hard-deleted; every relation (settings, subscription,
+ *    key, OAuth accounts, sessions, habits + logs, goals + milestones,
+ *    achievements, insights, analytics snapshots, password reset tokens)
+ *    cascades. Orphaned VerificationToken rows are removed by email.
+ */
+export async function eraseAccount(userId: string, email: string) {
+  await prisma.$transaction([
+    prisma.userKey.deleteMany({ where: { userId } }),
+    prisma.verificationToken.deleteMany({ where: { identifier: email.trim().toLowerCase() } }),
+    prisma.user.delete({ where: { id: userId } }),
+  ]);
 }
 
 export async function resetPassword(token: string, newPassword: string) {

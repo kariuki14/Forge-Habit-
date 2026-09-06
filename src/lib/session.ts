@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
+import { decryptUser } from "@/lib/pii";
+import type { User } from "@prisma/client";
 
 export const SESSION_COOKIE = "forge_session";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -25,14 +27,14 @@ export async function createSession(userId: string): Promise<void> {
   });
 }
 
-export async function getSessionUser() {
+export async function getSessionUser(): Promise<User | null> {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
 
   const session = await prisma.session.findUnique({
     where: { sessionToken: token },
-    include: { user: true },
+    include: { user: { include: { key: true } } },
   });
 
   if (!session) return null;
@@ -40,7 +42,9 @@ export async function getSessionUser() {
     await prisma.session.delete({ where: { id: session.id } }).catch(() => {});
     return null;
   }
-  return session.user;
+  // Decrypt PII fields (email, fullName, avatarUrl, bio) before handing
+  // the user to any page/action. Callers never see ciphertext.
+  return decryptUser(session.user);
 }
 
 export async function destroySession(): Promise<void> {

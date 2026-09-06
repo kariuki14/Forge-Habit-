@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Avatar } from "@/components/PageHeader";
 import ToggleSwitch, { AppearanceModeSwitch } from "@/components/ToggleSwitch";
 import { signOutAction } from "@/actions/auth";
+import { DeleteAccountButton } from "@/components/DeleteAccountButton";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/session";
 
@@ -117,6 +118,13 @@ export default async function SettingsPage() {
           Log Out
         </button>
       </form>
+
+      <section>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-red-400">
+          Danger Zone
+        </p>
+        <DeleteAccountButton hasPassword={Boolean(sessionUser.passwordHash)} />
+      </section>
     </div>
   );
 }

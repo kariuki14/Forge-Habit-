@@ -107,11 +107,14 @@ enum AnalyticsPeriod {
 
 model User {
   id              String    @id @default(cuid())
-  email           String    @unique
+  // email, fullName, avatarUrl, bio store AES-256-GCM ciphertext ("v1.*")
+  // encrypted with this user's DEK (see UserKey). Look up users by emailIndex.
+  email           String    @db.VarChar(1024)
+  emailIndex      String    @unique
   passwordHash    String?
-  fullName        String    @db.VarChar(120)
-  avatarUrl       String?
-  bio             String?   @db.VarChar(280)
+  fullName        String    @db.VarChar(512)
+  avatarUrl       String?   @db.VarChar(2048)
+  bio             String?   @db.VarChar(1024)
   currentStreak   Int       @default(0)
   bestStreak      Int       @default(0)
   xpPoints        Int       @default(0)
@@ -125,6 +128,7 @@ model User {
 
   settings     UserSettings?
   subscription Subscription?
+  key          UserKey?
   accounts     Account[]
   sessions     Session[]
   habits       Habit[]
@@ -177,6 +181,21 @@ model Session {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+/**
+ * Per-user Data Encryption Key (DEK), wrapped with the master KEK from
+ * DATA_ENCRYPTION_KEY. Deleting this row is the crypto-erasure event:
+ * the user's encrypted PII becomes permanently unrecoverable even if the
+ * ciphertext still exists in a backup.
+ */
+model UserKey {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  wrappedDek String   @db.VarChar(256)
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Subscription {
