@@ -35,7 +35,7 @@ export default function ProgressRing({
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold text-forest">{clamped}%</span>
+        <span className="text-2xl font-bold text-forest dark:text-lime-400">{clamped}%</span>
       </div>
     </div>
   );

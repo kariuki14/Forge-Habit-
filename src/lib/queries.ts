@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { startOfLocalDay } from "@/lib/habits";
+import type { UserTier } from "@prisma/client";
+import { decryptUser } from "@/lib/pii";
 
 export type TodayHabit = {
   id: string;
@@ -17,7 +19,11 @@ export type TodayHabit = {
 const WEEKDAY_LABELS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] as const;
 
 export async function getTodayView(userId: string) {
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+  const userWithKey = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    include: { key: true },
+  });
+  const user = decryptUser(userWithKey);
   const today = startOfLocalDay(user.timezone);
 
   const [habits, quote, weekLogs, todayLogs] = await Promise.all([
@@ -119,16 +125,6 @@ export async function getHabitsView(userId: string, timezone = "UTC") {
     }),
   ]);
 
-  const perDay = new Map<number, { done: number; total: number }>();
-  for (const log of weekLogs) {
-    // log.date is already day-aligned (stored as UTC midnight of the local date)
-    const key = log.date.getTime();
-    const e = perDay.get(key) ?? { done: 0, total: 0 };
-    e.total += 1;
-    if (log.completed) e.done += 1;
-    perDay.set(key, e);
-  }
-
   return {
     habits: habits.map((h) => ({
       id: h.id,
@@ -150,8 +146,6 @@ export async function getHabitsView(userId: string, timezone = "UTC") {
 }
 
 export async function getInsightsView(userId: string) {
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
-
   const [habits, insights, snapshot] = await Promise.all([
     prisma.habit.findMany({
       where: { userId, isArchived: false },
@@ -190,7 +184,7 @@ export async function getInsightsView(userId: string) {
     .map(([label, count]) => ({ label, pct: Math.round((count / habits.length) * 100) }))
     .sort((a, b) => b.pct - a.pct);
 
-  return { user, bestStreak, impactPct, breakdown, insights };
+  return { bestStreak, impactPct, breakdown, insights };
 }
 
 export async function getGoalsView(userId: string) {

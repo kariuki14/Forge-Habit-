@@ -35,7 +35,7 @@ export default function NewHabitSheet() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Create habit"
-        className="absolute bottom-24 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-forest text-white shadow-lg shadow-forest/30 transition-transform active:scale-90"
+        className="fixed bottom-24 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-forest text-white shadow-lg shadow-forest/30 transition-transform active:scale-90"
       >
         <Plus size={26} strokeWidth={2.4} />
       </button>

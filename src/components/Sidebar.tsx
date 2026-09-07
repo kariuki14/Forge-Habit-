@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CalendarDays, ListChecks, BarChart2, Target, Settings, Flame, type LucideIcon } from "lucide-react";
+import type { UserTier } from "@prisma/client";
 import { Avatar } from "@/components/PageHeader";
 
 const TABS: Array<{ href: string; label: string; icon: LucideIcon }> = [
@@ -12,7 +13,7 @@ const TABS: Array<{ href: string; label: string; icon: LucideIcon }> = [
   { href: "/goals", label: "Goals", icon: Target },
 ];
 
-export default function Sidebar({ user }: { user: { fullName: string; avatarUrl?: string | null; currentStreak: number; tier: string } }) {
+export default function Sidebar({ user }: { user: { fullName: string; avatarUrl?: string | null; currentStreak: number; tier: UserTier } }) {
   const pathname = usePathname();
 
   return (

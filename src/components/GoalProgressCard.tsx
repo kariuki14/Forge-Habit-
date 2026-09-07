@@ -9,8 +9,6 @@ const PACE_META: Record<string, { icon: LucideIcon; className: string; label: st
   behind: { icon: TrendingDown, className: "text-orange-500", label: "Behind pace" },
 };
 
-const ICON_FALLBACK = Flag;
-
 export default function GoalProgressCard({
   goal,
 }: {
@@ -23,7 +21,7 @@ export default function GoalProgressCard({
     unit: string;
     pct: number;
     nextMilestone: { title: string; sequenceOrder: number } | null;
-    pace: string;
+    pace: "ahead" | "on-track" | "behind";
   };
 }) {
   const PaceIcon = PACE_META[goal.pace]?.icon ?? Minus;

@@ -8,7 +8,7 @@ const STATUS_STYLES: Record<string, { dot: string; num: string }> = {
 export default function WeekMatrix({
   days,
 }: {
-  days: Array<{ label: string; dayNum: number; status: string }>;
+  days: Array<{ label: string; dayNum: number; status: "done" | "partial" | "missed" | "today" }>;
 }) {
   return (
     <div className="grid grid-cols-7 gap-1.5">

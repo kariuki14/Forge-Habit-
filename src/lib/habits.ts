@@ -1,7 +1,7 @@
 import { Prisma, HabitCategory, FrequencyType, TimeWindow, DayOfWeek } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { XP_PER_COMPLETION, tierForXp } from "@/lib/auth";
-import { habitInputSchema, checkInSchema } from "@/lib/validations";
+import { habitInputSchema } from "@/lib/validations";
 
 export class HabitError extends Error {}
 
@@ -67,24 +67,6 @@ export type HabitInput = {
   colorTheme?: string;
 };
 
-export function habitInputFromJson(body: unknown): HabitInput {
-  if (!body || typeof body !== "object") throw new HabitError("Invalid request body");
-  const b = body as Record<string, unknown>;
-  return {
-    title: String(b.title ?? ""),
-    description: b.description != null ? String(b.description) : undefined,
-    category: String(b.category ?? ""),
-    targetValue: Number(b.targetValue),
-    unit: String(b.unit ?? ""),
-    timeWindow: b.timeWindow != null ? String(b.timeWindow) : undefined,
-    frequency: b.frequency != null ? String(b.frequency) : undefined,
-    timesPerWeek: b.timesPerWeek != null ? Number(b.timesPerWeek) : null,
-    customDays: Array.isArray(b.customDays) ? b.customDays.map(String) : undefined,
-    icon: b.icon != null ? String(b.icon) : undefined,
-    colorTheme: b.colorTheme != null ? String(b.colorTheme) : undefined,
-  };
-}
-
 export function habitInputFromFormData(formData: FormData): HabitInput {
   const frequency = String(formData.get("frequency") ?? "DAILY");
   return {
@@ -100,34 +82,8 @@ export function habitInputFromFormData(formData: FormData): HabitInput {
 }
 
 // ---------------------------------------------------------------------------
-// Queries
+// Habit creation
 // ---------------------------------------------------------------------------
-
-async function getUserTimezone(userId: string): Promise<string> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { timezone: true },
-  });
-  return user?.timezone ?? "UTC";
-}
-
-export async function listHabits(userId: string) {
-  const tz = await getUserTimezone(userId);
-  const today = startOfLocalDay(tz);
-  const habits = await prisma.habit.findMany({
-    where: { userId, isArchived: false },
-    orderBy: { createdAt: "asc" },
-    include: {
-      logs: { where: { date: today }, select: { completed: true, valueLogged: true } },
-    },
-  });
-  return habits.map(({ logs, ...habit }) => ({
-    ...habit,
-    todayCompleted: logs.some((l) => l.completed),
-    todayValue: logs[0]?.valueLogged ?? null,
-  }));
-}
-
 export async function createHabit(userId: string, rawInput: HabitInput) {
   const parsed = habitInputSchema.safeParse(rawInput);
   if (!parsed.success) throw new HabitError(parsed.error.issues[0]?.message ?? "Invalid habit data");
@@ -326,77 +282,5 @@ export async function toggleCheckIn(userId: string, habitId: string) {
     await applyUserStreakStats(userId, tx);
 
     return { completed: nowCompleted, ...counters };
-  });
-}
-
-export async function checkIn(
-  userId: string,
-  habitId: string,
-  rawInput: { valueLogged?: number; durationMinutes?: number; note?: string } = {}
-) {
-  const parsed = checkInSchema.safeParse(rawInput);
-  if (!parsed.success) throw new HabitError(parsed.error.issues[0]?.message ?? "Invalid check-in data");
-  const input = parsed.data;
-
-  if (input.note != null && input.note.length > 500)
-    throw new HabitError("Note must be at most 500 characters");
-  if (
-    input.durationMinutes != null &&
-    (!Number.isFinite(input.durationMinutes) || input.durationMinutes < 0)
-  )
-    throw new HabitError("durationMinutes must be >= 0");
-
-  const habit = await prisma.habit.findFirst({
-    where: { id: habitId, userId },
-    include: { user: { select: { timezone: true } } },
-  });
-  if (!habit) throw new HabitError("Habit not found");
-  if (habit.isArchived) throw new HabitError("Habit is archived");
-
-  const value =
-    input.valueLogged !== undefined ? Number(input.valueLogged) : Number(habit.targetValue);
-  if (!Number.isFinite(value) || value < 0) throw new HabitError("valueLogged must be >= 0");
-
-  const date = startOfLocalDay(habit.user.timezone);
-
-  return prisma.$transaction(async (tx) => {
-    const existing = await tx.habitLog.findUnique({
-      where: { habitId_date: { habitId, date } },
-    });
-
-    const wasCompleted = existing?.completed ?? false;
-    const nowCompleted = value >= Number(habit.targetValue);
-
-    const log = await tx.habitLog.upsert({
-      where: { habitId_date: { habitId, date } },
-      create: {
-        habitId,
-        userId,
-        date,
-        completed: nowCompleted,
-        valueLogged: value,
-        durationMinutes: input.durationMinutes ?? null,
-        note: input.note ?? null,
-        completedAt: nowCompleted ? new Date() : null,
-      },
-      update: {
-        valueLogged: value,
-        completed: wasCompleted || nowCompleted,
-        durationMinutes: input.durationMinutes ?? existing?.durationMinutes ?? null,
-        note: input.note ?? existing?.note ?? null,
-        completedAt:
-          wasCompleted || nowCompleted ? (existing?.completedAt ?? new Date()) : null,
-      },
-    });
-
-    const finalCompleted = wasCompleted || nowCompleted;
-    const counters = await incrementalCounters(habit, date, wasCompleted, finalCompleted, tx);
-
-    if (!wasCompleted && nowCompleted) {
-      await applyXpDelta(userId, XP_PER_COMPLETION, tx);
-    }
-    await applyUserStreakStats(userId, tx);
-
-    return { log, counters };
   });
 }

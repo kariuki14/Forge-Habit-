@@ -19,16 +19,21 @@ export default function CompletedGoalCard({
 }) {
   const [pending, startTransition] = useTransition();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function handleReopen() {
+    setError(null);
     startTransition(async () => {
-      await reopenGoalAction(goal.id);
+      const res = await reopenGoalAction(goal.id);
+      if (res.error) setError(res.error);
     });
   }
 
   function handleDelete() {
+    setError(null);
     startTransition(async () => {
-      await deleteGoalAction(goal.id);
+      const res = await deleteGoalAction(goal.id);
+      if (res.error) setError(res.error);
     });
   }
 
@@ -105,6 +110,7 @@ export default function CompletedGoalCard({
             </button>
           </>
         )}
+        {error && <p className="text-[10px] text-red-500">{error}</p>}
       </div>
     </div>
   );

@@ -80,11 +80,7 @@ export const habitInputSchema = z.object({
     .optional(),
 });
 
-export const checkInSchema = z.object({
-  valueLogged: z.number().min(0).max(1_000_000).optional(),
-  durationMinutes: z.number().int().min(0).max(1440).optional(),
-  note: z.string().trim().max(500).optional(),
-});
+
 
 export const goalSchema = z.object({
   title: z.string().trim().min(1, "Title must be 1-160 characters").max(160),

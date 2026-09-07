@@ -18,8 +18,6 @@ export const TIME_WINDOWS = [
   "NIGHT",
 ] as const;
 
-export const FREQUENCIES = ["DAILY", "WEEKLY"] as const;
-
 export const GOAL_CATEGORIES = [
   "READING",
   "FITNESS",

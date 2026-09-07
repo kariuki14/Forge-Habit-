@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     }
 
     const token = parsed.data.token;
-    if (!rateLimit(clientKey(req.headers, token), AUTH_LIMIT.limit, AUTH_LIMIT.windowMs)) {
+    if (!rateLimit(clientKey(req.headers), AUTH_LIMIT.limit, AUTH_LIMIT.windowMs)) {
       return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
     }
 

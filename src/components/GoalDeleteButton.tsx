@@ -10,7 +10,8 @@ export default function GoalDeleteButton({ goalId }: { goalId: string }) {
 
   function handleDelete() {
     startTransition(async () => {
-      await deleteGoalAction(goalId);
+      const res = await deleteGoalAction(goalId);
+      if (res.error) console.error(res.error);
     });
   }
 

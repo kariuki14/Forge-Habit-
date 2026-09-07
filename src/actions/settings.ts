@@ -11,7 +11,7 @@ export async function updateSettingsAction(input: {
   appearanceMode?: "LIGHT" | "DARK" | "SYSTEM";
 }) {
   const user = await getSessionUser();
-  if (!user) throw new Error("Unauthorized");
+  if (!user) return { error: "Unauthorized" };
 
   const parsed = settingsSchema.safeParse(input);
   if (!parsed.success) {
