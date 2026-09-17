@@ -18,8 +18,9 @@ const FROM = process.env.EMAIL_FROM || "noreply@forge.app";
 
 export async function sendOtpEmail(to: string, code: string) {
   if (!transporter) {
-    // Dev fallback: no SMTP configured -> log the code instead of failing.
-    console.warn(`[email] SMTP not configured. OTP for ${to}: ${code}`);
+    // Dev fallback: no SMTP configured -> log only that email was attempted
+    // NEVER log the actual OTP code or reset tokens to prevent information disclosure
+    console.warn(`[email] SMTP not configured. OTP email to ${to} would be sent (code not logged for security).`);
     return;
   }
   await transporter.sendMail({
@@ -45,7 +46,9 @@ export async function sendOtpEmail(to: string, code: string) {
 
 export async function sendPasswordResetEmail(to: string, resetUrl: string) {
   if (!transporter) {
-    console.warn(`[email] SMTP not configured. Password reset link for ${to}: ${resetUrl}`);
+    // Dev fallback: no SMTP configured -> log only that email was attempted
+    // NEVER log the actual reset URL/token to prevent information disclosure
+    console.warn(`[email] SMTP not configured. Password reset email to ${to} would be sent (URL not logged for security).`);
     return;
   }
   await transporter.sendMail({

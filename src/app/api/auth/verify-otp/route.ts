@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { AuthError, verifyOtp } from "@/lib/auth";
 import { createSession } from "@/lib/session";
-import { rateLimit, clientKey, AUTH_LIMIT } from "@/lib/rate-limit";
+import { rateLimit, clientKey, AUTH_LIMIT, OTP_VERIFY_LIMIT } from "@/lib/rate-limit";
 import { verifyOtpSchema } from "@/lib/validations";
 
 export async function POST(req: Request) {
@@ -17,6 +17,13 @@ export async function POST(req: Request) {
       );
     }
     const email = parsed.data.email;
+    
+    // Apply stricter rate limit for OTP verification to prevent brute force attacks
+    if (!rateLimit(clientKey(req.headers, `otp:${email}`), OTP_VERIFY_LIMIT.limit, OTP_VERIFY_LIMIT.windowMs)) {
+      return NextResponse.json({ error: "Too many verification attempts. Please wait 15 minutes and try again." }, { status: 429 });
+    }
+    
+    // Also apply general auth rate limit
     if (!rateLimit(clientKey(req.headers, email), AUTH_LIMIT.limit, AUTH_LIMIT.windowMs)) {
       return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
     }

@@ -196,7 +196,7 @@ export async function verifyOtp(email: string, otp: string): Promise<User> {
     where: { emailIndex: emailIndex(email) },
     include: { key: true },
   });
-  if (!user) throw new AuthError("No account found with this email");
+  if (!user) throw new AuthError("Invalid verification code");
   if (user.verified) throw new AuthError("This account is already verified");
   if (!user.emailOtp || !user.emailOtpExpires) throw new AuthError("No verification code found. Please request a new one.");
   if (user.emailOtpExpires < new Date()) throw new AuthError("Verification code expired. Please request a new one.");
@@ -218,8 +218,8 @@ export async function resendOtp(email: string) {
   const user = await prisma.user.findUnique({
     where: { emailIndex: emailIndex(email) },
   });
-  if (!user) throw new AuthError("No account found with this email");
-  if (user.verified) throw new AuthError("This account is already verified");
+  // Use generic error to prevent account enumeration
+  if (!user || user.verified) throw new AuthError("Invalid verification code");
 
   const otp = generateOtp();
   const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
